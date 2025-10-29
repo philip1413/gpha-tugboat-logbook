@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPHA Tugboat Engine Room Logbook</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @media print {
+            body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+            .print\\:hidden { display: none !important; }
+            input, textarea { border: none !important; background: transparent !important; }
+            table { page-break-inside: avoid; }
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div class="min-h-screen p-4 print:p-8">
+        <div class="max-w-7xl mx-auto bg-white shadow-lg print:shadow-none">
+            <div class="bg-blue-900 text-white p-6 print:bg-blue-900">
+                <h1 class="text-2xl font-bold text-center">GHANA PORTS AND HARBOURS AUTHORITY</h1>
+                <h2 class="text-xl text-center mt-2">TUGBOAT ENGINE ROOM LOGBOOK</h2>
+            </div>
+
+            <div class="p-4 flex gap-2 flex-wrap print:hidden bg-gray-100 border-b-2 border-gray-300">
+                <button onclick="saveData()" class="flex items-center gap-2 bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 font-semibold shadow-md">
+                    💾 <span id="saveText">Save Logbook</span>
+                </button>
+                <button onclick="showSubmitModal()" class="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 font-semibold shadow-md">
+                    📤 Submit to Google Sheets
+                </button>
+                <button onclick="showEmailModal()" class="flex items-center gap-2 bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 font-semibold shadow-md">
+                    ✉️ Email Report
+                </button>
+                <button onclick="window.print()" class="flex items-center gap-2 bg-gray-700 text-white px-6 py-3 rounded-lg hover:bg-gray-800 font-semibold shadow-md">
+                    🖨️ Print
+                </button>
+            </div>
+
+            <div class="p-6" id="mainContent"></div>
+
+            <div class="p-4 text-center text-sm text-gray-600 print:hidden">
+                <p>Ghana Ports and Harbours Authority - Tugboat Engine Room Monitoring System</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="submitModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-lg p-6 max-w-2xl w-full max-h-screen overflow-y-auto">
+            <h3 class="text-xl font-bold mb-4">Submit to Google Sheets</h3>
+            <div class="mb-4">
+                <label class="block font-semibold mb-2">Google Sheets Web App URL:</label>
+                <input type="text" id="sheetUrl" placeholder="https://script.google.com/macros/s/YOUR_ID/exec" class="w-full p-3 border-2 border-gray-300 rounded text-sm">
+                <p class="text-xs text-gray-500 mt-1">Example: https://script.google.com/macros/s/YOUR_ID/exec</p>
+            </div>
+            <div id="submitStatus" class="hidden mb-4 p-3 rounded"></div>
+            <div class="flex gap-2 justify-end">
+                <button onclick="hideSubmitModal()" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">Cancel</button>
+                <button onclick="submitToSheets()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Submit Now</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="emailModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-lg p-6 max-w-md w-full">
+            <h3 class="text-xl font-bold mb-4">Email Report</h3>
+            <div class="mb-4">
+                <label class="block font-semibold mb-2">Recipient Email(s):</label>
+                <input type="text" id="emailRecipients" placeholder="engineer@ghaports.gov.gh, supervisor@ghaports.gov.gh" class="w-full p-2 border border-gray-300 rounded">
+                <p class="text-xs text-gray-500 mt-1">Separate multiple emails with commas</p>
+            </div>
+            <div class="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded text-sm">
+                <p class="font-semibold mb-1">Note:</p>
+                <p>This will open your default email client. The logbook summary will be included in the email body.</p>
+            </div>
+            <div class="flex gap-2 justify-end">
+                <button onclick="hideEmailModal()" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">Cancel</button>
+                <button onclick="sendEmail()" class="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700">Open Email Client</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function createHTML() {
+            const times = ['0600-1400', '1400-2200', '2200-0600'];
+            const timeLabels = ['0600', '1400', '2200'];
+            
+            let html = `
+                <div class="mb-6 grid grid-cols-2 gap-4">
+                    <div class="flex items-center gap-2">
+                        <label class="font-semibold">Date:</label>
+                        <input type="date" id="date" class="border-b-2 border-gray-300 px-2 py-1 print:border-black">
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <label class="font-semibold">Ship:</label>
+                        <input type="text" id="ship" class="border-b-2 border-gray-300 px-2 py-1 flex-1 print:border-black">
+                    </div>
+                    <div class="col-span-2 flex items-center gap-2">
+                        <label class="font-semibold">Sailing from:</label>
+                        <input type="text" id="sailingFrom" class="border-b-2 border-gray-300 px-2 py-1 flex-1 print:border-black">
+                        <label class="font-semibold">to:</label>
+                        <input type="text" id="sailingTo" class="border-b-2 border-gray-300 px-2 py-1 flex-1 print:border-black">
+                    </div>
+                </div>
+
+                <div class="mb-6 grid grid-cols-2 gap-4">
+                    <table class="w-full border-collapse border-2 border-gray-800 text-sm">
+                        <thead><tr class="bg-blue-200">
+                            <th class="border border-gray-800 p-2">Main Engine</th>
+                            ${times.map(t => `<th class="border border-gray-800 p-2">${t}</th>`).join('')}
+                        </tr></thead>
+                        <tbody>
+                            <tr><td class="border border-gray-800 p-2 font-semibold">PORT</td>
+                                ${timeLabels.map(t => `<td class="border border-gray-800 p-1"><input type="text" id="mainPort${t}" class="w-full p-1 text-center border-0"></td>`).join('')}
+                            </tr>
+                            <tr><td class="border border-gray-800 p-2 font-semibold">STBD</td>
+                                ${timeLabels.map(t => `<td class="border border-gray-800 p-1"><input type="text" id="mainStbd${t}" class="w-full p-1 text-center border-0"></td>`).join('')}
+                            </tr>
+                        </tbody>
+                    </table>
+                    <table class="w-full border-collapse border-2 border-gray-800 text-sm">
+                        <thead><tr class="bg-yellow-200">
+                            <th class="border border-gray-800 p-2">AUXS</th>
+                            ${times.map(t => `<th class="border border-gray-800 p-2">${t}</th>`).join('')}
+                        </tr></thead>
+                        <tbody>
+                            <tr><td class="border border-gray-800 p-2 font-semibold">1</td>
+                                ${timeLabels.map(t => `<td class="border border-gray-800 p-1"><input type="text" id="aux1_${t}" class="w-full p-1 text-center border-0"></td>`).join('')}
+                            </tr>
+                            <tr><td class="border border-gray-800 p-2 font-semibold">2</td>
+                                ${timeLabels.map(t => `<td class="border border-gray-800 p-1"><input type="text" id="aux2_${t}" class="w-full p-1 text-center border-0"></td>`).join('')}
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="mb-6 overflow-x-auto">
+                    <table class="w-full border-collapse border-2 border-gray-800 text-sm">
+                        <thead><tr class="bg-gray-200">
+                            <th class="border border-gray-800 p-2 text-left">Parameter</th>
+                            ${times.map(t => `<th class="border border-gray-800 p-2">${t}</th>`).join('')}
+                        </tr></thead>
+                        <tbody>`;
+
+            const sections = [
+                {name: 'GENERAL', color: 'bg-blue-100', prefix: 'gen', fields: ['stemTubeOilTemp', 'engineroomAirTemp', 'controlAirTemp', 'oilLevelPSShaftTank', 'oilLevelSBShaftTank'], 
+                 labels: ['Stem Tube Oil Temp', 'Engine Room Air Temp', 'Control Air Temp', 'Oil Level PS Shaft Tank', 'Oil Level SB Shaft Tank']},
+                {name: 'PORT MAIN ENGINE', color: 'bg-red-100', prefix: 'portMain', fields: ['rpm', 'lubeOilPressure', 'lubeOilTemp', 'coolingWaterTemp1', 'coolingWaterTemp2', 'exhaustTemp', 'gearboxOilTemp', 'turbochargerAirPressure', 'oilLevel', 'coolingWaterLevel', 'gearboxOilLevel'],
+                 labels: ['R.P.M', 'Lube Oil Pressure', 'Lube Oil Temp', 'Cooling Water Temp', 'Cooling Water Temp', 'Exhaust Temp', 'Gearbox Oil Temp', 'Turbocharger Air Pressure', 'Oil Level', 'Cooling Water Level', 'Gearbox Oil Level']},
+                {name: 'STARBOARD MAIN ENGINE', color: 'bg-green-100', prefix: 'stbdMain', fields: ['rpm', 'lubeOilPressure', 'lubeOilTemp', 'coolingWaterTemp1', 'coolingWaterTemp2', 'exhaustTemp', 'gearboxOilTemp', 'turbochargerAirPressure', 'oilLevel', 'coolingWaterLevel', 'gearboxOilLevel'],
+                 labels: ['R.P.M', 'Lube Oil Pressure', 'Lube Oil Temp', 'Cooling Water Temp', 'Cooling Water Temp', 'Exhaust Temp', 'Gearbox Oil Temp', 'Turbocharger Air Pressure', 'Oil Level', 'Cooling Water Level', 'Gearbox Oil Level']},
+                {name: 'PORT GENERATOR', color: 'bg-yellow-100', prefix: 'portGene', fields: ['lubOilPressure', 'oilTemp', 'oilLevel', 'coolingWaterTemp'],
+                 labels: ['Lube Oil Pressure', 'Oil Temp', 'Oil Level', 'Cooling Water Temp']},
+                {name: 'STARBOARD GENERATOR', color: 'bg-purple-100', prefix: 'stbdGene', fields: ['lubeOilPressure', 'oilTemp', 'oilLevel', 'coolingWaterTemp', 'coolingWaterLevel'],
+                 labels: ['Lube Oil Pressure', 'Oil Temp', 'Oil Level', 'Cooling Water Temp', 'Cooling Water Level']},
+                {name: 'FIRE ENGINE', color: 'bg-orange-100', prefix: 'fireEngine', fields: ['lubOilPressure', 'oilTemp', 'oilLevel', 'coolingWaterTemp', 'coolingWaterLevel'],
+                 labels: ['Lube Oil Pressure', 'Oil Temp', 'Oil Level', 'Cooling Water Temp', 'Cooling Water Level']}
+            ];
+
+            sections.forEach(section => {
+                html += `<tr class="${section.color} font-bold"><td colspan="4" class="border border-gray-800 p-2">${section.name}</td></tr>`;
+                section.fields.forEach((field, idx) => {
+                    html += `<tr><td class="border border-gray-800 p-2">${section.labels[idx]}</td>`;
+                    timeLabels.forEach(t => {
+                        html += `<td class="border border-gray-800 p-1"><input type="text" id="${section.prefix}_${field}_${t}" class="w-full p-1 text-center border-0"></td>`;
+                    });
+                    html += `</tr>`;
+                });
+            });
+
+            html += `</tbody></table></div>
+
+                <div class="mb-6">
+                    <h3 class="font-bold text-lg mb-2">CONSUMABLES</h3>
+                    <table class="w-full border-collapse border-2 border-gray-800 text-sm">
+                        <thead><tr class="bg-gray-200">
+                            <th class="border border-gray-800 p-2">Item</th>
+                            <th class="border border-gray-800 p-2">Quantity Yesterday</th>
+                            <th class="border border-gray-800 p-2">Today Consumption</th>
+                        </tr></thead>
+                        <tbody>`;
+            
+            const consumables = ['Fuel', 'Lub Oil', 'Fresh Water', 'Hydr Oil', 'Aff'];
+            const consumableIds = ['fuel', 'lubOil', 'freshWater', 'hydrOil', 'aff'];
+            consumables.forEach((item, idx) => {
+                html += `<tr><td class="border border-gray-800 p-2 font-semibold">${item}</td>
+                    <td class="border border-gray-800 p-1"><input type="text" id="${consumableIds[idx]}_yesterday" class="w-full p-1 text-center border-0"></td>
+                    <td class="border border-gray-800 p-1"><input type="text" id="${consumableIds[idx]}_today" class="w-full p-1 text-center border-0"></td></tr>`;
+            });
+
+            html += `</tbody></table></div>
+
+                <div class="mb-6">
+                    <h3 class="font-bold text-lg mb-2">OPERATION HOURS AND OTHER EQUIPMENT</h3>
+                    <table class="w-full border-collapse border-2 border-gray-800 text-sm">
+                        <thead><tr class="bg-gray-200">
+                            <th class="border border-gray-800 p-2">Equipment</th>
+                            <th class="border border-gray-800 p-2">Morning</th>
+                            <th class="border border-gray-800 p-2">Afternoon</th>
+                            <th class="border border-gray-800 p-2">Evening</th>
+                        </tr></thead>
+                        <tbody>`;
+
+            const equipment = ['Air Comp 1', 'Air Comp 2', 'Aircon', 'Steering Gear 1', 'Steering Gear 2', 'Emerg Comp', 'Bilge Water Sep'];
+            const equipIds = ['airComp1', 'airComp2', 'aircon', 'steeringGear1', 'steeringGear2', 'emergComp', 'bilgeWaterSep'];
+            const periods = ['morning', 'afternoon', 'evening'];
+            equipment.forEach((equip, idx) => {
+                html += `<tr><td class="border border-gray-800 p-2 font-semibold">${equip}</td>`;
+                periods.forEach(p => {
+                    html += `<td class="border border-gray-800 p-1"><input type="text" id="${equipIds[idx]}_${p}" class="w-full p-1 text-center border-0"></td>`;
+                });
+                html += `</tr>`;
+            });
+
+            html += `</tbody></table></div>
+
+                <div class="mb-6">
+                    <h3 class="font-bold text-lg mb-2">TANK SOUNDINGS</h3>
+                    <table class="w-full border-collapse border-2 border-gray-800 text-sm">
+                        <thead><tr class="bg-gray-200">
+                            <th class="border border-gray-800 p-2">Fuel Tank</th>
+                            <th class="border border-gray-800 p-2">No</th>
+                            <th class="border border-gray-800 p-2">Cm</th>
+                            <th class="border border-gray-800 p-2">Ltrs</th>
+                        </tr></thead>
+                        <tbody>`;
+
+            for(let i = 1; i <= 8; i++) {
+                html += `<tr><td class="border border-gray-800 p-2 font-semibold">Fuel Tank ${i}</td>
+                    <td class="border border-gray-800 p-1"><input type="text" id="tank${i}_no" class="w-full p-1 text-center border-0"></td>
+                    <td class="border border-gray-800 p-1"><input type="text" id="tank${i}_cm" class="w-full p-1 text-center border-0"></td>
+                    <td class="border border-gray-800 p-1"><input type="text" id="tank${i}_ltrs" class="w-full p-1 text-center border-0"></td></tr>`;
+            }
+
+            html += `</tbody></table></div>
+
+                <div class="mb-6">
+                    <h3 class="font-bold text-lg mb-4">CHIEF TUG ENGINEER'S REPORT</h3>`;
+
+            periods.forEach(p => {
+                html += `<div class="mb-4 border-2 border-gray-800 p-4">
+                    <h4 class="font-bold text-md mb-2 capitalize bg-blue-100 p-2">${p} Report</h4>
+                    <div class="mb-2">
+                        <label class="font-semibold block mb-1">Engineer Name:</label>
+                        <input type="text" id="${p}Name" class="w-full p-2 border border-gray-300 rounded">
+                    </div>
+                    <div>
+                        <label class="font-semibold block mb-1">Report:</label>
+                        <textarea id="${p}Report" class="w-full p-2 border border-gray-300 rounded h-24"></textarea>
+                    </div>
+                </div>`;
+            });
+
+            html += `</div>`;
+
+            document.getElementById('mainContent').innerHTML = html;
+            document.getElementById('date').valueAsDate = new Date();
+        }
+
+        function saveData() {
+            const data = {};
+            document.querySelectorAll('input, textarea').forEach(el => {
+                if(el.id && el.id !== 'sheetUrl' && el.id !== 'emailRecipients') data[el.id] = el.value;
+            });
+            localStorage.setItem('tugboatLogbook', JSON.stringify(data));
+            document.getElementById('saveText').textContent = '✓ Saved!';
+            setTimeout(() => document.getElementById('saveText').textContent = 'Save Logbook', 2000);
+        }
+
+        function loadData() {
+            const saved = localStorage.getItem('tugboatLogbook');
+            if(saved) {
+                const data = JSON.parse(saved);
+                Object.keys(data).forEach(key => {
+                    const el = document.getElementById(key);
+                    if(el) el.value = data[key];
+                });
+            }
+        }
+
+        function showSubmitModal() { document.getElementById('submitModal').classList.remove('hidden'); }
+        function hideSubmitModal() { document.getElementById('submitModal').classList.add('hidden'); }
+        function showEmailModal() { document.getElementById('emailModal').classList.remove('hidden'); }
+        function hideEmailModal() { document.getElementById('emailModal').classList.add('hidden'); }
+
+        async function submitToSheets() {
+            const url = document.getElementById('sheetUrl').value;
+            if(!url) { alert('Please enter your Google Sheets Web App URL'); return; }
+            
+            const statusDiv = document.getElementById('submitStatus');
+            statusDiv.textContent = 'Submitting...';
+            statusDiv.className = 'mb-4 p-3 rounded bg-blue-100 text-blue-700';
+            statusDiv.classList.remove('hidden');
+
+            const data = { timestamp: new Date().toISOString() };
+            document.querySelectorAll('input, textarea').forEach(el => {
+                if(el.id && el.id !== 'sheetUrl' && el.id !== 'emailRecipients') data[el.id] = el.value;
+            });
+
+            try {
+                await fetch(url, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+                statusDiv.textContent = '✓ Successfully submitted to Google Sheets!';
+                statusDiv.className = 'mb-4 p-3 rounded bg-green-100 text-green-700';
+                setTimeout(() => hideSubmitModal(), 2000);
+            } catch(error) {
+                statusDiv.textContent = 'Error submitting. Please check your URL and try again.';
+                statusDiv.className = 'mb-4 p-3 rounded bg-red-100 text-red-700';
+            }
+        }
+
+        function sendEmail() {
+            const recipients = document.getElementById('emailRecipients').value;
+            const ship = document.getElementById('ship').value;
+            const date = document.getElementById('date').value;
+            const sailingFrom = document.getElementById('sailingFrom').value;
+            const sailingTo = document.getElementById('sailingTo').value;
+            const morningName = document.getElementById('morningName').value;
+            const morningReport = document.getElementById('morningReport').value;
+            const afternoonName = document.getElementById('afternoonName').value;
+            const afternoonReport = document.getElementById('afternoonReport').value;
+            const eveningName = document.getElementById('eveningName').value;
+            const eveningReport = document.getElementById('eveningReport').value;
+
+            const subject = `Tugboat Engine Room Log - ${ship} - ${date}`;
+            const body = `GHANA PORTS AND HARBOURS AUTHORITY
+TUGBOAT ENGINE ROOM LOGBOOK
+
+Date: ${date}
+Ship: ${ship}
+Sailing from: ${sailingFrom} to ${sailingTo}
+
+=== MAIN ENGINE STATUS ===
+PORT Engine (0600-1400): ${document.getElementById('mainPort0600').value || 'N/A'}
+PORT Engine (1400-2200): ${document.getElementById('mainPort1400').value || 'N/A'}
+PORT Engine (2200-0600): ${document.getElementById('mainPort2200').value || 'N/A'}
+
+STBD Engine (0600-1400): ${document.getElementById('mainStbd0600').value || 'N/A'}
+STBD Engine (1400-2200): ${document.getElementById('mainStbd1400').value || 'N/A'}
+STBD Engine (2200-0600): ${document.getElementById('mainStbd2200').value || 'N/A'}
+
+=== CHIEF TUG ENGINEER'S REPORTS ===
+
+Morning Report:
+Engineer: ${morningName}
+Report: ${morningReport}
+
+Afternoon Report:
+Engineer: ${afternoonName}
+Report: ${afternoonReport}
+
+Evening Report:
+Engineer: ${eveningName}
+Report: ${eveningReport}
+
+[Full detailed data available in the logbook system]`;
+
+            window.location.href = `mailto:${recipients}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+            hideEmailModal();
+            alert('Email client opened. Please send the email from your email application.');
+        }
+
+        window.onload = function() {
+            createHTML();
+            loadData();
+            setInterval(saveData, 30000);
+        };
+    </script>
+</body>
+</html>
